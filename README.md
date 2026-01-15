@@ -1,6 +1,8 @@
 # NWC Faucet
 
-Create test wallets / dummy NWC connections for rapid app development and testing
+Build and test your application end to end without needing a real lightning wallet!
+
+NWC Faucet allows you to create test wallets / dummy NWC connections for rapid app development and testing.
 
 [Try it now](https://faucet.nwc.dev)
 
