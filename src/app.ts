@@ -37,6 +37,7 @@ async function createApp() {
       budgetRenewal: "monthly",
       maxAmount: 0,
       scopes: [
+        "get_info",
         "pay_invoice",
         "get_balance",
         "make_invoice",
