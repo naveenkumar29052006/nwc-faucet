@@ -127,11 +127,11 @@ fastify.get("/", async (request, reply) => {
 });
 
 fastify.post("/", async (request, reply) => {
-  const query = request.query as { balance?: string };
-  const body = request.body as { balance?: string };
-  const balance = body.balance
+  const query = request.query as { balance?: string } | undefined;
+  const body = request.body as { balance?: string } | undefined;
+  const balance = body?.balance
     ? parseInt(body.balance, 10)
-    : query.balance
+    : query?.balance
     ? parseInt(query.balance, 10)
     : undefined;
 
