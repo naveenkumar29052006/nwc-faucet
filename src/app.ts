@@ -2,6 +2,7 @@ import "dotenv/config";
 import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
 import fastifyBody from "@fastify/formbody";
+import fastifyCors from "@fastify/cors";
 import path from "path";
 
 const APP_NAME_PREFIX = "nwc";
@@ -81,7 +82,7 @@ async function transferToApp(appId: string, amountSat: number): Promise<void> {
         toAppId: appId,
         amountSat,
       }),
-    }
+    },
   );
 
   if (!transferResponse.ok) {
@@ -91,7 +92,7 @@ async function transferToApp(appId: string, amountSat: number): Promise<void> {
 
 async function createLightningAddress(
   appId: string,
-  address: string
+  address: string,
 ): Promise<void> {
   console.log("Creating lightning address", address, appId);
   const response = await fetch(
@@ -103,12 +104,12 @@ async function createLightningAddress(
         address,
         appId,
       }),
-    }
+    },
   );
 
   if (!response.ok) {
     throw new Error(
-      "Failed to create lightning address: " + (await response.text())
+      "Failed to create lightning address: " + (await response.text()),
     );
   }
 }
@@ -122,6 +123,9 @@ fastify.register(fastifyStatic, {
 });
 
 fastify.register(fastifyBody);
+fastify.register(fastifyCors, {
+  origin: "*",
+});
 
 fastify.get("/", async (request, reply) => {
   return reply.sendFile("index.html");
@@ -133,8 +137,8 @@ fastify.post("/", async (request, reply) => {
   const balance = body?.balance
     ? parseInt(body.balance, 10)
     : query?.balance
-    ? parseInt(query.balance, 10)
-    : undefined;
+      ? parseInt(query.balance, 10)
+      : undefined;
 
   try {
     const newApp = await createApp();
