@@ -240,7 +240,7 @@
 
       <div class="code-example" id="pay-curl-example">curl -X POST https://faucet.nwc.dev/pay \
         -H "Content-Type: application/json" \
-        -d '{"lightningAddress": "<span id="ln-address-value">eagervibrance726044@getalby.com</span>", "amount": <span
+        -d '{"lightningAddress": "<span id="ln-address-value">nwc_app_name@getalby.com</span>", "amount": <span
           id="amount-value">1000</span>}'</div>
 
     </div>
@@ -267,7 +267,7 @@
     const amountValue = document.getElementById("amount-value");
 
     function updatePayExample() {
-      lnAddressValue.textContent = lnAddressInput.value || "eagervibrance726044@getalby.com";
+      lnAddressValue.textContent = lnAddressInput.value || "nwc_app_name@getalby.com";
       amountValue.textContent = amountInput.value || "1000";
     }
 

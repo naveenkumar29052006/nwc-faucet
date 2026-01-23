@@ -167,74 +167,7 @@ fastify.post("/", async (request, reply) => {
   }
 });
 
-async function payInvoice(invoice: string): Promise<{
-  amount: number;
-  description: string;
-  destination: string;
-  fee: number;
-  payment_hash: string;
-  payment_preimage: string;
-  payment_request: string;
-}> {
-  const response = await fetch(new URL("/api/payments/bolt11", getAlbyHubUrl()), {
-    method: "POST",
-    headers: getHeaders(),
-    body: JSON.stringify({
-      invoice,
-    }),
-  });
 
-  if (!response.ok) {
-    throw new Error("Failed to pay invoice: " + (await response.text()));
-  }
-
-  return response.json();
-}
-
-async function resolveLightningAddress(address: string, amountSat: number) {
-  const [user, domain] = address.split("@");
-  if (!user || !domain) {
-    throw new Error("Invalid Lightning Address format");
-  }
-
-  const lnurlUrl = `https://${domain}/.well-known/lnurlp/${user}`;
-  console.log(`Fetching LNURL params from ${lnurlUrl}`);
-
-  const paramsRes = await fetch(lnurlUrl);
-  if (!paramsRes.ok) {
-    throw new Error(`Failed to resolve LN Address: ${paramsRes.status} ${paramsRes.statusText}`);
-  }
-
-  const params = await paramsRes.json();
-
-  if (params.tag !== "payRequest") {
-    throw new Error("Invalid LNURL response: tag is not payRequest");
-  }
-
-  const minSendable = params.minSendable / 1000; // millisats to sats
-  const maxSendable = params.maxSendable / 1000;
-
-  if (amountSat < minSendable || amountSat > maxSendable) {
-    throw new Error(`Amount must be between ${minSendable} and ${maxSendable} sats. (Address max: ${maxSendable})`);
-  }
-
-  const callbackUrl = new URL(params.callback);
-  callbackUrl.searchParams.append("amount", (amountSat * 1000).toString()); // millisats
-
-  console.log(`Fetching invoice from callback: ${callbackUrl.toString()}`);
-  const invoiceRes = await fetch(callbackUrl);
-  if (!invoiceRes.ok) {
-    throw new Error(`Failed to fetch invoice: ${invoiceRes.status} ${invoiceRes.statusText}`);
-  }
-
-  const invoiceData = await invoiceRes.json();
-  if (!invoiceData.pr) {
-    console.error("Invoice response missing 'pr':", invoiceData);
-    throw new Error("Invalid invoice response from callback");
-  }
-
-  return invoiceData.pr;
-}
 
 fastify.post("/pay", async (request, reply) => {
   const body = request.body as { lightningAddress?: string; amount?: string } | undefined;
@@ -246,29 +179,43 @@ fastify.post("/pay", async (request, reply) => {
     return;
   }
 
-  // Basic LN Address validation
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(lightningAddress)) {
-    reply.status(400).send({ error: "Invalid Lightning Address format" });
+  // Extract name from lightning address (e.g. "nwc123456" from "nwc123456@getalby.com")
+  const [appName] = lightningAddress.split("@");
+  if (!appName) {
+    reply.status(400).send({ error: "Invalid Lightning Address" });
     return;
   }
 
   try {
-    console.log(`Resolving LN Address: ${lightningAddress} for ${amount} sats`);
+    console.log(`Looking up app: ${appName}`);
 
-    const invoice = await resolveLightningAddress(lightningAddress, amount);
+    // 1. List all apps to find the one with this name
+    const appsResponse = await fetch(new URL("/api/apps", getAlbyHubUrl()), {
+      headers: getHeaders(),
+    });
 
-    console.log(`Paying invoice: ${invoice}`);
-    const result = await payInvoice(invoice);
+    if (!appsResponse.ok) {
+      throw new Error(`Failed to list apps: ${appsResponse.status}`);
+    }
+
+    const apps = (await appsResponse.json()) as { id: string; name: string }[];
+    const targetApp = apps.find((app) => app.name === appName);
+
+    if (!targetApp) {
+      throw new Error(`App not found: ${appName}. Make sure you created the wallet first.`);
+    }
+
+    console.log(`Found app ${appName} (ID: ${targetApp.id}), transferring ${amount} sats...`);
+
+    // 2. Transfer funds to the app
+    await transferToApp(targetApp.id, amount);
 
     return reply.send({
       message: "Payment successful",
-      preimage: result.payment_preimage,
-      amount: result.amount,
-      fee: result.fee
+      amount: amount,
     });
   } catch (error) {
-    console.error("Payment flow failed:", error);
+    console.error("Top up failed:", error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     reply.status(500).send({ error: errorMessage });
   }
